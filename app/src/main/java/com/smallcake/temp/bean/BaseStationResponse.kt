@@ -9,12 +9,12 @@ package com.smallcake.temp.bean
  */
 data class BaseStationResponse(
     val address: String,//地址
-    val errcode: String,
+    val errcode: String,//错误码
     val lat: Double,
     val lon: Double,
-    val radius: String
+    val radius: String//基站覆盖范围
 ){
     override fun toString(): String {
-        return "经纬度:[${lat},${lon}]精度半径:[$radius] \n地址:$address\n"
+        return "经纬度:[${lat},${lon}] \n地址:$address"
     }
 }

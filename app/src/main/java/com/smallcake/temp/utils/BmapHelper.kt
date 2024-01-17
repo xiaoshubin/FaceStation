@@ -24,9 +24,11 @@ import com.baidu.mapapi.search.geocode.*
 import com.hjq.permissions.Permission
 import com.hjq.permissions.XXPermissions
 import com.smallcake.temp.R
+import com.smallcake.temp.utils.BmapHelper.onceLocation
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.parameter.parametersOf
+
 
 /**
  *
@@ -277,6 +279,29 @@ object BmapHelper: KoinComponent {
                     "&mode=driving" + "&src=andr.baidu.openAPIdemo"  + "#Intent;scheme=bdapp;package=com.baidu.BaiduMap;end"
         )
         context.startActivity(intent)
+    }
+
+    /**
+     * 绘制线条
+     */
+    fun drawLines(mBaiduMap:BaiduMap,latLngPoints:List<LatLng>){
+        //构建折线点坐标
+        val points: MutableList<LatLng> = ArrayList()
+        latLngPoints.forEach {latLng->
+            points.add(latLng)
+        }
+        val colors: MutableList<Int> = ArrayList()
+        colors.add(Integer.valueOf(Color.RED))
+        colors.add(Integer.valueOf(Color.BLUE))
+        colors.add(Integer.valueOf(Color.YELLOW))
+        colors.add(Integer.valueOf(Color.GREEN))
+        //设置折线的属性
+        val mOverlayOptions: OverlayOptions = PolylineOptions()
+            .width(3)
+            .color(-0x55010000)
+            .points(points)
+            .colorsValues(colors) //设置每段折线的颜色
+        val mPolyline: Overlay = mBaiduMap.addOverlay(mOverlayOptions)
     }
 
 }
