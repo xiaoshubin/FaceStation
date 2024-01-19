@@ -90,6 +90,11 @@
             tools:text="基站定位和车辆位置距离"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"/>
+        <androidx.appcompat.widget.AppCompatButton
+            android:text="WIFI扫描"
+            android:id="@+id/btn_scan_wifi"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
     </androidx.appcompat.widget.LinearLayoutCompat>
     <com.baidu.mapapi.map.MapView
         android:id="@+id/bmapView"

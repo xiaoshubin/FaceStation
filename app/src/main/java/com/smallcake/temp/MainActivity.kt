@@ -1,15 +1,15 @@
 package com.smallcake.temp
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.telephony.*
-import android.telephony.cdma.CdmaCellLocation
-import android.telephony.gsm.GsmCellLocation
 import android.util.Log
-import com.baidu.location.BDLocation
-import com.baidu.mapapi.NetworkUtil
 import com.baidu.mapapi.model.LatLng
 import com.baidu.mapapi.utils.DistanceUtil
 import com.bumptech.glide.Glide
@@ -21,24 +21,19 @@ import com.hjq.permissions.XXPermissions
 import com.smallcake.smallutils.text.NavigationBar
 import com.smallcake.temp.base.BaseBindActivity
 import com.smallcake.temp.base.Constant
-import com.smallcake.temp.base.addFragment
 import com.smallcake.temp.bean.BaseDataBean
 import com.smallcake.temp.bean.FaceRequest
 import com.smallcake.temp.bean.FaceRequestItem
 import com.smallcake.temp.bean.FaceResponse
 import com.smallcake.temp.databinding.ActivityMainBinding
-import com.smallcake.temp.fragment.HomeFragment
-import com.smallcake.temp.fragment.ListFragment
-import com.smallcake.temp.fragment.MineFragment
 import com.smallcake.temp.utils.*
 import com.tencent.bugly.crashreport.CrashReport
-import com.yx.jiading.utils.sizeNull
-import org.koin.core.component.bind
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
-import java.lang.NullPointerException
+import java.lang.StringBuilder
+import java.net.NetworkInterface
 import java.util.*
 
 /**
@@ -87,6 +82,16 @@ loadMoreModule.loadMoreEnd()
 
  车辆固定位置:
 [29.542206,106.568574]
+wifi
+[政府项目部 24:69:68:eb:ba:d2]
+ -->
+{
+"errcode": 0,
+"lat": "29.542465447299726",
+"lon": "106.56874022772882",
+"radius": "336",
+"address": "重庆市南岸区铜元局街道玖玺国际9栋;南坪北路与亚太路路口西北130米"
+}
  */
 class MainActivity : BaseBindActivity<ActivityMainBinding>() {
 
@@ -187,8 +192,73 @@ class MainActivity : BaseBindActivity<ActivityMainBinding>() {
         bind.bmapView.addMarker(scanLatLng)
         bind.bmapView.toCenter(scanLatLng)
 
+        mWifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
+        getMac()
 
+        bind.btnScanWifi.setOnClickListener {
+            val latlng = LatLng(29.542465447299726,106.56874022772882)//政府项目部wifi对应地址
+            val distance =  DistanceUtil.getDistance(scanLatLng, latlng)
+            bind.tvDistance.text = "wifi定位<-${distance.toInt()}米->车辆位置"
+            BmapHelper.drawLines(bind.bmapView.map, listOf(scanLatLng, latlng))
+        }
     }
+
+
+
+
+    /**
+     * 扫描wifi
+     * 1.在onCreate方法中获取WiFi管理器mWifiManager
+     * 2.声明一个WiFi扫描接收器对象mWifiScanReceiver并实现onReceive方法获取扫描结果列表
+     * 3.在onResume方法中注册WiFi扫描的广播接收器
+     * 4.在onPause方法中注销WiFi扫描的广播接收器
+     */
+    private var mWifiScanReceiver: WifiScanReceiver? = WifiScanReceiver() // 声明一个WiFi扫描接收器对象
+    private lateinit var mWifiManager:WifiManager//从系统服务中获取WiFi管理器
+    inner class WifiScanReceiver: BroadcastReceiver() {
+         override fun onReceive(context: Context?, intent: Intent?) {
+             // 获取WiFi扫描的结果列表
+             val scanList = mWifiManager.scanResults
+             scanList.forEach {
+                 val SSID = it.SSID//名称
+                 val BSSID = it.BSSID//Mac地址
+                 val rssi = it.level//信号强度，得到的值是一个0到-100的区间值，是一个int型数据
+                 val level = WifiManager.calculateSignalLevel(rssi, 6)//信号强度等级，根据强度值，分为6个等级，5最大，表示强度最高
+                 L.e("[$SSID $BSSID]${rssi}->${level}")
+             }
+         }
+     }
+    override fun onResume() {
+        super.onResume()
+        val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        registerReceiver(mWifiScanReceiver,filter)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        unregisterReceiver(mWifiScanReceiver)
+    }
+
+    fun getMac(){
+        val list = Collections.list(NetworkInterface.getNetworkInterfaces())
+        list.forEach {networkInterface ->
+            val macBytes = networkInterface.hardwareAddress
+            if (macBytes!=null){
+                val macAddress  = StringBuilder()
+                macBytes.forEach {b->
+                    macAddress.append(String.format("%02X:",b))
+                }
+                if (macAddress.isNotEmpty()){
+                    macAddress.deleteCharAt(macAddress.length-1)
+                }
+                val wifiMacAddress =  macAddress.toString()
+                L.e("${networkInterface.name} [$wifiMacAddress]")
+            }
+
+        }
+    }
+
+
 
     override fun onDestroy() {
         bind.bmapView.map.isMyLocationEnabled = false
@@ -196,25 +266,8 @@ class MainActivity : BaseBindActivity<ActivityMainBinding>() {
     }
 
     fun getBaseData(mContext: Context, cb:(list:ArrayList<BaseDataBean>)->Unit) {
-        // lac连接基站位置区域码 cellid连接基站编码 mcc MCC国家码 mnc MNC网号
-        // signalstrength连接基站信号强度
         val list: ArrayList<BaseDataBean> = ArrayList<BaseDataBean>()
-//        val beans = BaseDataBean()
         val telephonyManager = mContext.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-//        val operator = telephonyManager.networkOperator
-//        beans.mcc = operator.substring(0, 3)
-//        beans.mnc = operator.substring(3)
-//        if (telephonyManager.phoneType == TelephonyManager.PHONE_TYPE_CDMA) { // 这是电信的
-//            val cdmaCellLocation = telephonyManager.cellLocation as CdmaCellLocation
-//            beans.cellId = cdmaCellLocation.baseStationId.toString() + ""
-//            beans.lac = cdmaCellLocation.networkId.toString() + ""
-//        } else { // 这是移动和联通的
-//            val gsmCellLocation = telephonyManager.cellLocation as GsmCellLocation?
-//            beans.cellId = gsmCellLocation?.cid.toString() + ""
-//            beans.lac = gsmCellLocation?.lac.toString() + ""
-//        }
-//        beans.signalStrength = "0"
-//        list.add(beans)
         //获取邻区基站信息
         val infoLists = telephonyManager.allCellInfo
         if (infoLists.size != 0) {
